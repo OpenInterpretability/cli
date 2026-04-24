@@ -8,7 +8,7 @@ Search the feature Atlas, generate Traces from your own SAE, rank against the pu
 
 [![PyPI](https://img.shields.io/pypi/v/openinterp.svg?color=8b5cf6)](https://pypi.org/project/openinterp/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![License MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![License Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green)](./LICENSE)
 [![openinterp.org](https://img.shields.io/badge/site-openinterp.org-8b5cf6)](https://openinterp.org)
 [![Discussions](https://img.shields.io/github/discussions/OpenInterpretability/cli)](https://github.com/OpenInterpretability/cli/discussions)
 
@@ -235,6 +235,6 @@ Green required to merge.
 
 ## License
 
-**MIT.** Built by [Caio Vicentino](https://huggingface.co/caiovicentino1) + OpenInterpretability. 2026.
+**Apache-2.0.** Built by [Caio Vicentino](https://huggingface.co/caiovicentino1) + OpenInterpretability. 2026.
 
 [openinterp.org](https://openinterp.org) · [github.com/OpenInterpretability](https://github.com/OpenInterpretability) · [hi@openinterp.org](mailto:hi@openinterp.org)

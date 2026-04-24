@@ -21,7 +21,7 @@ from openinterp.models import AtlasFeature, Trace, TraceFeature
 
 __version__ = "0.1.0"
 __author__ = "Caio Vicentino"
-__license__ = "MIT"
+__license__ = "Apache-2.0"
 
 __all__ = [
     "search_features",
