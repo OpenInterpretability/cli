@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/OpenInterpretability/cli/discussions
+    about: Design questions, API proposals, "which repo should this live in?"
+  - name: 📦 PyPI
+    url: https://pypi.org/project/openinterp/
+    about: Installed version + release history.
+  - name: 📘 Docs
+    url: https://openinterp.org/docs
+    about: Full docs site.
