@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openinterp-cli"
+version = "0.0.1"
+description = "Python SDK + CLI for openinterp.org — search feature Atlas, generate Traces, upload SAEs"
+authors = [{name = "Caio Vicentino", email = "hi@openinterp.org"}]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["interpretability", "sparse autoencoder", "mechanistic", "LLM", "safety"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "click>=8.1",
+    "requests>=2.31",
+    "rich>=13.0",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4"]
+
+[project.scripts]
+openinterp = "openinterp.cli:main"
+
+[project.urls]
+Homepage = "https://openinterp.org"
+Repository = "https://github.com/OpenInterpretability/cli"
+Documentation = "https://openinterp.org/docs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["openinterp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["openinterp", "tests", "README.md", "LICENSE", "pyproject.toml"]
