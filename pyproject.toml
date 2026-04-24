@@ -3,31 +3,61 @@ requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [project]
-name = "openinterp-cli"
-version = "0.0.1"
-description = "Python SDK + CLI for openinterp.org — search feature Atlas, generate Traces, upload SAEs"
+name = "openinterp"
+version = "0.1.0"
+description = "Python SDK + CLI for openinterp.org — search the feature Atlas, generate Traces from your SAE, compute InterpScore. The operational layer for mechanistic interpretability."
 authors = [{name = "Caio Vicentino", email = "hi@openinterp.org"}]
-license = "MIT"
+license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = ["interpretability", "sparse autoencoder", "mechanistic", "LLM", "safety"]
+keywords = [
+    "interpretability",
+    "sparse autoencoder",
+    "mechanistic interpretability",
+    "sae",
+    "LLM",
+    "ai safety",
+    "transformer",
+    "trace",
+    "circuit",
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
 ]
 dependencies = [
     "click>=8.1",
     "requests>=2.31",
     "rich>=13.0",
     "pydantic>=2.0",
+    "huggingface_hub>=0.27",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4"]
+# Real model + SAE loading for `trace`, `score`, `steer`
+full = [
+    "torch>=2.3",
+    "transformers>=4.55",
+    "safetensors>=0.4",
+    "accelerate>=1.0",
+    "numpy>=1.26",
+]
+# Developer tooling
+dev = [
+    "pytest>=7",
+    "pytest-cov>=4",
+    "ruff>=0.4",
+    "build>=1.0",
+    "twine>=5.0",
+]
 
 [project.scripts]
 openinterp = "openinterp.cli:main"
@@ -36,9 +66,11 @@ openinterp = "openinterp.cli:main"
 Homepage = "https://openinterp.org"
 Repository = "https://github.com/OpenInterpretability/cli"
 Documentation = "https://openinterp.org/docs"
+"Bug Tracker" = "https://github.com/OpenInterpretability/cli/issues"
+Changelog = "https://github.com/OpenInterpretability/cli/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["openinterp"]
 
 [tool.hatch.build.targets.sdist]
-include = ["openinterp", "tests", "README.md", "LICENSE", "pyproject.toml"]
+include = ["openinterp", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml"]

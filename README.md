@@ -1,106 +1,125 @@
-# openinterp-cli
+# openinterp
 
-[![PyPI](https://img.shields.io/pypi/v/openinterp-cli.svg)](https://pypi.org/project/openinterp-cli/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Docs](https://img.shields.io/badge/docs-openinterp.org-blue.svg)](https://openinterp.org/docs)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+> Python SDK + CLI for [openinterp.org](https://openinterp.org) — search the feature Atlas, generate Traces from your SAE, rank against the InterpScore leaderboard.
 
-Python SDK + CLI for [openinterp.org](https://openinterp.org) — search the
-feature **Atlas**, generate per-token **Traces**, and upload your own SAEs.
-
-> **Status: v0.0.1 (Alpha).** The public surface is live and installable today.
-> The full Atlas backend and on-device `generate_trace()` land in **v0.1.0 (Q2 2026)**.
-> Until then the SDK ships a curated offline fallback so every example below runs.
+[![PyPI](https://img.shields.io/pypi/v/openinterp.svg)](https://pypi.org/project/openinterp/)
+[![License MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![openinterp.org](https://img.shields.io/badge/site-openinterp.org-8b5cf6)](https://openinterp.org)
 
 ---
 
 ## Install
 
 ```bash
-pip install openinterp-cli
+pip install openinterp              # lite: Atlas search + CLI (no torch)
+pip install "openinterp[full]"      # + torch/transformers/safetensors for trace generation
 ```
 
-Requires Python 3.10+.
+Requires Python ≥ 3.10.
 
 ---
 
-## Quickstart
+## Quick start
 
-### 1. Search the Atlas from the CLI
+### Search the Atlas (offline, no GPU needed)
 
 ```bash
-openinterp atlas "overconfidence"
+$ openinterp atlas "overconfidence"
 ```
 
 ```
-                    Atlas results: 'overconfidence'
-┏━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓
-┃ ID     ┃ Name                    ┃ Model             ┃ AUROC ┃ Description┃
-┡━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
-│ f2503  │ overconfidence_pattern  │ Qwen/Qwen3.6-27B  │  0.54 │ Definitive…│
-└────────┴─────────────────────────┴───────────────────┴───────┴────────────┘
+        Atlas results: 'overconfidence'
+┏━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━…
+┃ ID    ┃ Name                  ┃ Model            ┃ AUROC ┃ Description
+┡━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━…
+│ f2503 │ overconfidence_patt…  │ Qwen/Qwen3.6-27B │  0.54 │ Definitive …
+│ f1847 │ urgency_assessment    │ Qwen/Qwen3.6-27B │  0.68 │ Time-critic…
+└───────┴───────────────────────┴──────────────────┴───────┴────────────…
 ```
-
-### 2. Search from Python
 
 ```python
-from openinterp import search_features
-
-features = search_features("medical reasoning", limit=5)
-for f in features:
-    print(f"{f.id}  {f.name:30s}  AUROC={f.auroc}")
+>>> from openinterp import search_features
+>>> features = search_features("overconfidence", model="Qwen/Qwen3.6-27B")
+>>> features[0].id
+'f2503'
 ```
 
-### 3. Generate a Trace (v0.1.0 preview)
+### Generate a Trace from your own SAE
+
+```bash
+pip install "openinterp[full]"
+
+openinterp trace \
+    --model google/gemma-2-2b \
+    --sae-repo YOUR_HF_USER/gemma2-2b-sae-first \
+    --prompt "The capital of France is" \
+    --layer 12 \
+    --d-model 2304 --d-sae 16384 --k 64 \
+    --out my_trace.json
+```
+
+This:
+1. Loads the base model in bf16 with SDPA
+2. Loads your SAE from HuggingFace (sae_lens format)
+3. Generates 30 tokens, captures residuals at layer 12
+4. Applies the SAE, picks top-10 active features
+5. Writes a `Trace` JSON that matches [openinterp.org/observatory/trace](https://openinterp.org/observatory/trace) exactly
+
+### Use the Trace in the Python API
 
 ```python
 from openinterp import generate_trace
 
-# Ships in v0.1.0 (Q2 2026). For now the call raises NotImplementedError with
-# a pointer to the public interactive trace at openinterp.org/observatory/trace.
 trace = generate_trace(
-    model_id="Qwen/Qwen3.6-27B",
-    prompt="The patient presents with acute chest pain.",
-    sae_repo="caiovicentino1/qwen36-27b-sae-multilayer",
+    model_id="google/gemma-2-2b",
+    sae_repo="YOUR_HF_USER/gemma2-2b-sae-first",
+    prompt="The capital of France is",
+    layer=12,
+    d_model=2304,
+    d_sae=16384,
+    k=64,
 )
+
+print(trace.model_dump_json(indent=2))  # Exact Trace Theater schema
+```
+
+### Optionally attach feature labels from notebook 04
+
+```bash
+# After running 04_discover_features.ipynb and saving feature_catalog.json:
+openinterp trace ... --catalog feature_catalog.json
 ```
 
 ---
 
-## CLI reference
+## What's in v0.1.0
 
-```
-openinterp --help
-openinterp atlas <query> [--model HF_ID] [--limit N]
-openinterp trace --model HF_ID --prompt TEXT [--sae-repo HF_ID]
-openinterp --version
-```
+| Command | Status | What it does |
+|---|---|---|
+| `openinterp atlas <query>` | ✅ Live | Feature search across the public Atlas, with offline fallback to the shipped demo features |
+| `openinterp trace ...` | ✅ Live (needs `[full]`) | Real SAE-based trace generation, sae_lens format, any HF model |
+| `openinterp info` | ✅ Live | Show version + optional dep status |
 
----
-
-## Roadmap
-
-| Version | Target   | Ships                                                          |
-|---------|----------|----------------------------------------------------------------|
-| 0.0.1   | Apr 2026 | Public API surface, Atlas search (curated fallback), CLI skeleton |
-| 0.1.0   | Q2 2026  | Live Atlas backend, `generate_trace()`, `upload_trace()`       |
-| 0.2.0   | Q3 2026  | SAE upload, cross-model feature diffing, notebook integration  |
+Planned for **v0.2.0 (Q2 2026)**:
+- `openinterp upload-trace trace.json` → get a shareable openinterp.org URL
+- `openinterp score --sae-repo X` → compute InterpScore locally (wraps notebook 18)
+- `openinterp steer --sae-repo X --feature Y --alpha Z` → live intervention (wraps notebook 06)
+- `openinterp circuit --sae-repo X --prompt Y` → attribution graph JSON (wraps notebook 14/15)
+- `openinterp publish <repo> <artifact>` → HuggingFace release with model card
 
 ---
 
-## Links
+## Standing on the shoulders of
 
-- Homepage: <https://openinterp.org>
-- Docs: <https://openinterp.org/docs>
-- Observatory (live traces): <https://openinterp.org/observatory/trace>
-- Repository: <https://github.com/OpenInterpretability/cli>
-- Notebooks: <https://github.com/OpenInterpretability/notebooks>
+- [Neuronpedia](https://neuronpedia.org) — the SAE encyclopedia
+- [Gemma Scope](https://huggingface.co/google/gemma-scope) — reference at-scale SAE suite
+- [Gao et al. 2024](https://arxiv.org/abs/2406.04093) — TopK + AuxK recipe
+- [SAELens](https://github.com/jbloomAus/SAELens) — our safetensors format
 
 ---
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT. Built by [Caio Vicentino](https://huggingface.co/caiovicentino1) + OpenInterpretability. 2026.
 
-Built by [Caio Vicentino](https://openinterp.org) as part of the
-OpenInterpretability project.
+[openinterp.org](https://openinterp.org) · [github.com/OpenInterpretability](https://github.com/OpenInterpretability) · [hi@openinterp.org](mailto:hi@openinterp.org)

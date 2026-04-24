@@ -1,8 +1,11 @@
+"""Pydantic models shared across the SDK."""
 from pydantic import BaseModel, Field
 from typing import Optional
 
 
 class AtlasFeature(BaseModel):
+    """A feature entry in the cross-model Atlas."""
+
     id: str                                    # e.g. "f2503"
     name: str                                  # e.g. "overconfidence_pattern"
     description: str
@@ -13,12 +16,32 @@ class AtlasFeature(BaseModel):
     top_activating_tokens: list[str] = Field(default_factory=list)
 
 
-class Trace(BaseModel):
+class TraceFeature(BaseModel):
+    """One feature inside a Trace — matches openinterp.org Trace Theater schema."""
+
     id: str
+    name: str
+    desc: str
+    auroc: float = 0.0
+
+
+class Trace(BaseModel):
+    """
+    A Trace: per-token feature activations from a model+SAE+prompt.
+
+    Matches the openinterp.org Trace Theater JSON schema
+    (lib/trace-data.ts) byte-compatible.
+    """
+
     prompt: str
     model: str
+    layer: str
+    sae_repo: str
     tokens: list[str]
-    feature_ids: list[str]
-    activations: list[list[float]]             # [features][tokens]
+    features: list[TraceFeature]
+    # activations[feature_idx][token_idx], values in [0, 1]
+    activations: list[list[float]]
+    counterfactuals: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # Optional metadata
+    url: Optional[str] = None
     created_at: Optional[str] = None
-    url: Optional[str] = None                  # shareable openinterp.org URL

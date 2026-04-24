@@ -1,8 +1,18 @@
 """openinterp — command line interface."""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Optional
+
 import click
 from rich.console import Console
 from rich.table import Table
-from openinterp import __version__, search_features, generate_trace
+
+from openinterp import __version__
+from openinterp.atlas import search_features
+from openinterp.trace import generate_trace, TraceUnavailable
 
 console = Console()
 
@@ -10,45 +20,137 @@ console = Console()
 @click.group()
 @click.version_option(__version__, prog_name="openinterp")
 def main():
-    """openinterp — search Atlas, generate Traces, upload SAEs.
+    """openinterp — operational mechanistic interpretability.
 
-    Full docs: https://openinterp.org/docs
+    Full docs: https://openinterp.org
+    Notebooks: https://github.com/OpenInterpretability/notebooks
     """
-    pass
 
+
+# --- atlas -------------------------------------------------------------------
 
 @main.command()
 @click.argument("query")
-@click.option("--model", "-m", default=None, help="Filter by HF model ID")
-@click.option("--limit", "-n", default=10, help="Max results")
-def atlas(query: str, model: str | None, limit: int):
+@click.option("--model", "-m", default=None, help="Filter by HF model ID.")
+@click.option("--limit", "-n", default=10, help="Max results (default 10).")
+@click.option("--json", "as_json", is_flag=True, help="Output raw JSON.")
+def atlas(query: str, model: Optional[str], limit: int, as_json: bool):
     """Search the Atlas for features matching QUERY."""
     features = search_features(query, model=model, limit=limit)
+    if as_json:
+        console.print_json(
+            json.dumps([f.model_dump() for f in features], ensure_ascii=False)
+        )
+        return
     if not features:
         console.print(f"[yellow]No features found for '{query}'[/yellow]")
         return
     t = Table(title=f"Atlas results: '{query}'")
-    t.add_column("ID", style="cyan")
+    t.add_column("ID", style="cyan", no_wrap=True)
     t.add_column("Name", style="bold")
     t.add_column("Model", style="dim")
     t.add_column("AUROC", justify="right")
     t.add_column("Description")
     for f in features:
-        t.add_row(f.id, f.name, f.model, f"{f.auroc:.2f}" if f.auroc else "—", f.description[:60])
+        auroc = f"{f.auroc:.2f}" if f.auroc is not None else "—"
+        t.add_row(f.id, f.name, f.model, auroc, f.description[:70])
     console.print(t)
 
 
+# --- trace -------------------------------------------------------------------
+
 @main.command()
-@click.option("--model", "-m", required=True, help="HF model ID, e.g. Qwen/Qwen3.6-27B")
-@click.option("--prompt", "-p", required=True, help="Input prompt")
-@click.option("--sae-repo", default=None, help="HF SAE repo, auto-detected if omitted")
-def trace(model: str, prompt: str, sae_repo: str | None):
-    """Generate a feature-activation Trace for PROMPT on MODEL."""
+@click.option("--model", "-m", required=True, help="HF model ID, e.g. 'google/gemma-2-2b'.")
+@click.option("--sae-repo", required=True, help="HF SAE repo, e.g. 'YOUR/gemma2-2b-sae-first'.")
+@click.option("--prompt", "-p", required=True, help="Input prompt.")
+@click.option("--layer", "-l", required=True, type=int, help="Target residual-stream layer.")
+@click.option("--d-model", default=2304, help="Base model hidden dim (default 2304 for Gemma-2-2B).")
+@click.option("--d-sae", default=16384, help="SAE dictionary size.")
+@click.option("--k", default=32, help="TopK sparsity.")
+@click.option("--max-new-tokens", default=30, help="Tokens to generate.")
+@click.option("--top-n", default=10, help="Top features to include in trace.")
+@click.option("--device", default=None, help="cuda / cpu (auto if omitted).")
+@click.option("--catalog", type=click.Path(exists=True), default=None,
+              help="Optional feature_catalog.json from notebook 04 for labels.")
+@click.option("--out", "-o", type=click.Path(), default="trace.json",
+              help="Output file (default trace.json).")
+def trace(
+    model: str,
+    sae_repo: str,
+    prompt: str,
+    layer: int,
+    d_model: int,
+    d_sae: int,
+    k: int,
+    max_new_tokens: int,
+    top_n: int,
+    device: Optional[str],
+    catalog: Optional[str],
+    out: str,
+):
+    """Generate a Trace (JSON) from model + SAE + prompt.
+
+    Requires optional dependencies:  pip install 'openinterp\\[full]'
+
+    Example:
+
+        openinterp trace -m google/gemma-2-2b \\
+                         --sae-repo YOUR/gemma2-2b-sae-first \\
+                         -p "The capital of France is" \\
+                         -l 12 --d-model 2304 --d-sae 16384 --k 64
+    """
+    catalog_data = None
+    if catalog:
+        catalog_data = json.loads(Path(catalog).read_text())
+
     try:
-        t = generate_trace(model, prompt, sae_repo=sae_repo)
-        console.print_json(t.model_dump_json(indent=2))
-    except NotImplementedError as e:
+        with console.status("[bold magenta]Loading model and SAE…"):
+            t = generate_trace(
+                model_id=model,
+                prompt=prompt,
+                sae_repo=sae_repo,
+                layer=layer,
+                d_model=d_model,
+                d_sae=d_sae,
+                k=k,
+                max_new_tokens=max_new_tokens,
+                top_n_features=top_n,
+                device=device,
+                feature_catalog=catalog_data,
+            )
+    except TraceUnavailable as e:
         console.print(f"[yellow]{e}[/yellow]")
+        sys.exit(2)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+    Path(out).write_text(t.model_dump_json(indent=2))
+    console.print(f"[green]✓[/green] Trace saved to {out}")
+    console.print(f"  prompt: {t.prompt[:80]}{'…' if len(t.prompt) > 80 else ''}")
+    console.print(f"  tokens: {len(t.tokens)}")
+    console.print(f"  features: {len(t.features)} "
+                  f"(top: {', '.join(f.id for f in t.features[:5])}…)")
+    console.print("\nView it at [cyan]https://openinterp.org/observatory/trace[/cyan] "
+                  "(Q2 upload endpoint pending).")
+
+
+# --- info --------------------------------------------------------------------
+
+@main.command()
+def info():
+    """Show installed version + optional dep status."""
+    console.print(f"[bold]openinterp[/bold] v{__version__}")
+    console.print(f"  homepage: [cyan]https://openinterp.org[/cyan]")
+    console.print(f"  repo: [cyan]https://github.com/OpenInterpretability/cli[/cyan]")
+    try:
+        import torch
+        import transformers
+        console.print(f"  [green]✓ full stack[/green] — torch {torch.__version__}, "
+                      f"transformers {transformers.__version__}")
+    except ImportError:
+        console.print(f"  [yellow]○ lite[/yellow] — install "
+                      f"'openinterp\\[full]' for trace generation")
 
 
 if __name__ == "__main__":
