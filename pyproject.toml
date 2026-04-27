@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openinterp"
-version = "0.1.0"
-description = "Python SDK + CLI for openinterp.org — search the feature Atlas, generate Traces from your SAE, compute InterpScore. The operational layer for mechanistic interpretability."
+version = "0.2.0"
+description = "Python SDK + CLI for openinterp.org — Atlas search, SAE Traces, FabricationGuard hallucination detection, InterpScore. The operational layer for mechanistic interpretability."
 authors = [{name = "Caio Vicentino", email = "hi@openinterp.org"}]
 license = {text = "Apache-2.0"}
 readme = "README.md"
@@ -20,6 +20,10 @@ keywords = [
     "transformer",
     "trace",
     "circuit",
+    "hallucination",
+    "fabrication",
+    "guard",
+    "linear probe",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -42,13 +46,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Real model + SAE loading for `trace`, `score`, `steer`
+# Real model + SAE loading for `trace`, `score`, `steer`, `guard`
 full = [
     "torch>=2.3",
     "transformers>=4.55",
     "safetensors>=0.4",
     "accelerate>=1.0",
     "numpy>=1.26",
+    "scikit-learn>=1.3",
+    "joblib>=1.3",
 ]
 # Developer tooling
 dev = [

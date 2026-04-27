@@ -4,6 +4,54 @@ All notable changes to `openinterp` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0] — 2026-04-27
+
+### Added — FabricationGuard
+
+- **`FabricationGuard` class** for activation-probe hallucination detection on
+  open-weights LLMs. AUROC 0.88 cross-task on SimpleQA, **−88% confident-wrong
+  reduction** on factual QA, **~1 ms** scoring latency. Apache-2.0.
+  - `FabricationGuard.from_pretrained(model_id)` downloads the matching probe
+    from HuggingFace (initial registry entry: `Qwen/Qwen3.6-27B` →
+    [`caiovicentino1/FabricationGuard-linearprobe-qwen36-27b`](https://huggingface.co/datasets/caiovicentino1/FabricationGuard-linearprobe-qwen36-27b)).
+  - `.attach(model, tokenizer)` registers a forward hook at the probe layer
+    (L31 for Qwen3.6-27B). Idempotent; safe to re-attach. Hook lifecycle is
+    managed via `.close()` / context manager / `__del__`.
+  - `.score(prompt)` returns fabrication probability ∈ [0, 1] in ~1 ms.
+  - `.generate(prompt, mode=…)` runs `model.generate` with optional abstention.
+    Modes: `detect` | `warn` | `abstain`.
+  - `GuardOutput` dataclass with structured response: `text`, `score`,
+    `flagged`, `mode`, `abstained`, `threshold`.
+  - Custom `abstain_response` override + arbitrary `generate_kwargs` pass-through.
+  - Auto layer-list discovery handles dense + multimodal + hybrid GDN layouts.
+  - Helpful `FabricationGuardError` raised when `[full]` extras missing.
+- **`openinterp guard ...`** CLI command. Loads model, attaches probe, scores,
+  optionally generates with abstention. `--json` for machine output.
+- `scikit-learn>=1.3` and `joblib>=1.3` added to the `[full]` extra (both
+  needed to load the probe artifact).
+- `tests/test_guard.py` — structural tests + invariants.
+
+### Changed
+- `__init__.py` now exports `FabricationGuard`, `FabricationGuardError`,
+  `GuardOutput`.
+- Package keywords expanded: `hallucination`, `fabrication`, `guard`,
+  `linear probe`.
+
+### Source artifacts
+- Probe + headline figure: <https://huggingface.co/datasets/caiovicentino1/FabricationGuard-linearprobe-qwen36-27b>
+- Reproducer notebooks (open-source): `OpenInterpretability/notebooks/30_hallucinationguard_proof_qwen36_27b.ipynb`
+  and `31_hallucinationguard_v2_linear_probe.ipynb`.
+
+### Planned for 0.3.0
+- Multi-model probes via Pearson_CE cross-model transfer (Llama-3.3, Gemma-2,
+  Mistral). Methodology in [`gemma2-2b-crosscoder-model-diff-papergrade`](https://huggingface.co/caiovicentino1/gemma2-2b-crosscoder-model-diff-papergrade).
+- `openinterp score`, `openinterp steer`, `openinterp circuit`,
+  `openinterp publish` wrapping notebooks 18/06/14/15.
+- vLLM + SGLang inference plugins.
+- LangChain + LlamaIndex middleware.
+
+---
+
 ## [0.1.0] — 2026-04-23
 
 ### Added

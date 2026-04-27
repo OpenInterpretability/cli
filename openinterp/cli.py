@@ -13,6 +13,7 @@ from rich.table import Table
 from openinterp import __version__
 from openinterp.atlas import search_features
 from openinterp.trace import generate_trace, TraceUnavailable
+from openinterp.guard import FabricationGuard, FabricationGuardError
 
 console = Console()
 
@@ -133,6 +134,94 @@ def trace(
                   f"(top: {', '.join(f.id for f in t.features[:5])}…)")
     console.print("\nView it at [cyan]https://openinterp.org/observatory/trace[/cyan] "
                   "(Q2 upload endpoint pending).")
+
+
+# --- guard -------------------------------------------------------------------
+
+@main.command()
+@click.option("--model", "-m", required=True, help="HF model ID (e.g. 'Qwen/Qwen3.6-27B').")
+@click.option("--prompt", "-p", required=True, help="Input prompt to score / generate.")
+@click.option("--mode", type=click.Choice(["detect", "warn", "abstain"]), default="detect",
+              help="detect = score only;  warn = flag in output;  abstain = replace high-score with uncertainty response.")
+@click.option("--threshold", type=float, default=None,
+              help="Override calibrated threshold (default uses probe metadata).")
+@click.option("--probe-repo", default=None,
+              help="Override default probe registry — HF dataset with probe.joblib + meta.json.")
+@click.option("--max-new-tokens", default=128, help="Tokens to generate when not abstaining.")
+@click.option("--device", default=None, help="cuda / cpu (auto if omitted).")
+@click.option("--json", "as_json", is_flag=True, help="Output raw JSON.")
+def guard(
+    model: str,
+    prompt: str,
+    mode: str,
+    threshold: Optional[float],
+    probe_repo: Optional[str],
+    max_new_tokens: int,
+    device: Optional[str],
+    as_json: bool,
+):
+    """Run FabricationGuard on a prompt — score + optional abstention.
+
+    Requires optional dependencies:  pip install 'openinterp\\[full]'
+
+    Example:
+
+        openinterp guard -m Qwen/Qwen3.6-27B \\
+                         -p "Who is Bambale Osby?" \\
+                         --mode abstain
+    """
+    try:
+        with console.status("[bold magenta]Loading model + probe…"):
+            from transformers import AutoTokenizer
+            try:
+                from transformers import AutoModelForImageTextToText as _ModelCls
+            except ImportError:
+                from transformers import AutoModelForCausalLM as _ModelCls
+            import torch
+
+            tok = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
+            kwargs = dict(
+                dtype=torch.bfloat16, attn_implementation="sdpa",
+                trust_remote_code=True,
+            )
+            if device:
+                kwargs["device_map"] = {"": device}
+            else:
+                kwargs["device_map"] = "auto"
+            try:
+                hf_model = _ModelCls.from_pretrained(model, **kwargs)
+            except Exception:
+                from transformers import AutoModelForCausalLM
+                hf_model = AutoModelForCausalLM.from_pretrained(model, **kwargs)
+            hf_model.eval()
+
+            g = FabricationGuard.from_pretrained(model, probe_repo=probe_repo,
+                                                  threshold=threshold)
+            g.attach(hf_model, tok)
+
+        with console.status("[bold magenta]Scoring + generating…"):
+            out = g.generate(prompt, mode=mode, max_new_tokens=max_new_tokens)
+
+    except FabricationGuardError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        sys.exit(2)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+    if as_json:
+        console.print_json(json.dumps(out, ensure_ascii=False))
+        return
+
+    score_color = "red" if out["flagged"] else ("yellow" if out["score"] > 0.4 else "green")
+    console.print(f"\n[bold]Prompt:[/bold] {prompt}")
+    console.print(f"[bold]Mode:[/bold] {out['mode']}    [bold]Threshold:[/bold] {out['threshold']:.3f}")
+    console.print(f"[bold]Score:[/bold] [{score_color}]{out['score']:.3f}[/{score_color}]    "
+                  f"[bold]Flagged:[/bold] {'⚠  YES' if out['flagged'] else 'no'}")
+    if out["abstained"]:
+        console.print(f"[bold]Status:[/bold] [yellow]ABSTAINED[/yellow] (score above threshold)")
+    console.print(f"\n[bold]Output:[/bold]")
+    console.print(out["text"])
 
 
 # --- info --------------------------------------------------------------------
