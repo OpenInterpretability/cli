@@ -130,6 +130,23 @@ output = guard.generate("Who won the 2003 Nobel Prize in Aerodynamics?", mode="a
 
 **Methodology lineage**: extends [Anthropic's persona-vectors approach](https://arxiv.org/abs/2507.21509) (Aug 2025, tested on 7-8B) to Qwen3.6-27B (3-4× larger) with formal cross-task AUROC + bootstrap CIs + mitigation-rate evaluation. Apache-2.0 production-grade implementation, not a proprietary platform. Probe artifact: [`caiovicentino1/FabricationGuard-linearprobe-qwen36-27b`](https://huggingface.co/datasets/caiovicentino1/FabricationGuard-linearprobe-qwen36-27b). Live demo: [openinterp.org/products/fabricationguard](https://openinterp.org/products/fabricationguard).
 
+## 🧠 ReasonGuard v0.1 (in registry)
+
+[![ReasonGuard headline](https://huggingface.co/datasets/caiovicentino1/ReasoningGuard-linearprobe-qwen36-27b/resolve/main/reasoningguard_headline.png)](https://huggingface.co/datasets/caiovicentino1/ReasoningGuard-linearprobe-qwen36-27b)
+
+Reasoning-faithfulness probe at **L55 / mid_think** on Qwen3.6-27B in thinking mode. Detects wrong-answer trajectories *during* the `<think>` block. **Honest narrow scope**: AUROC 0.888 within math reasoning (GSM8K), 0.605 cross-domain to commonsense (StrategyQA) — domain-bound, not generalized.
+
+**Layer × position interaction (novel)**: shallow layers (L31) favor `end_question`; deep layers (L55) favor `mid_think`. Position-of-faithfulness migrates with depth.
+
+```python
+from openinterp import probebench
+
+probe = probebench.load("openinterp/reasonguard-qwen36-27b-l55-mid_think")
+score = probe.score(activations)  # P(wrong-answer trajectory)
+```
+
+Both numbers (within + cross) registered honestly per ProbeBench's anti-Goodhart norms. Probe artifact: [`caiovicentino1/ReasoningGuard-linearprobe-qwen36-27b`](https://huggingface.co/datasets/caiovicentino1/ReasoningGuard-linearprobe-qwen36-27b). Live on [openinterp.org/probebench](https://openinterp.org/probebench/probe/openinterp%2Freasonguard-qwen36-27b-l55-mid_think).
+
 ## 🧬 ProbeBench (v0.2.0+)
 
 The first categorical leaderboard for activation probes — 8 categories, 7-axis ProbeScore, anti-Goodhart by construction.
@@ -170,7 +187,7 @@ Browse the leaderboard: [openinterp.org/probebench](https://openinterp.org/probe
 - `openinterp steer --sae-repo X --feature Y --alpha Z` → intervention (wraps [notebook 06](https://github.com/OpenInterpretability/notebooks/blob/main/notebooks/06_steer_your_model.ipynb))
 - `openinterp circuit --sae-repo X --prompt Y` → attribution graph JSON (wraps [notebook 14/15](https://github.com/OpenInterpretability/notebooks/))
 - `openinterp publish <repo>` → HuggingFace release with model card
-- ReasoningGuard probe (in-flight, Apr 2026)
+- ReasonGuard v0.2 — multi-bench training (math + commonsense) to fix cross-domain transfer
 
 Open an issue on the [tracker](https://github.com/OpenInterpretability/cli/issues) if you'd take one of these.
 
