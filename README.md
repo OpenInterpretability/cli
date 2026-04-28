@@ -114,21 +114,63 @@ Trace features inherit names from your catalog.
 
 ---
 
-## 📦 What's in v0.1.0
+## 🛡️ FabricationGuard (v0.2.0+)
+
+[![FabricationGuard headline](https://huggingface.co/datasets/caiovicentino1/FabricationGuard-linearprobe-qwen36-27b/resolve/main/chart_hero.png)](https://huggingface.co/datasets/caiovicentino1/FabricationGuard-linearprobe-qwen36-27b)
+
+Production hallucination probe on Qwen3.6-27B. AUROC 0.88 cross-task on SimpleQA, **−88% confident-wrong reduction** in mitigation mode, ~1ms scoring latency.
+
+```python
+from openinterp import FabricationGuard
+
+guard = FabricationGuard.from_pretrained("Qwen/Qwen3.6-27B")
+output = guard.generate("Who won the 2003 Nobel Prize in Aerodynamics?", mode="abstain")
+# → "I don't have reliable information to answer this confidently."
+```
+
+**Methodology lineage**: extends [Anthropic's persona-vectors approach](https://arxiv.org/abs/2507.21509) (Aug 2025, tested on 7-8B) to Qwen3.6-27B (3-4× larger) with formal cross-task AUROC + bootstrap CIs + mitigation-rate evaluation. Apache-2.0 production-grade implementation, not a proprietary platform. Probe artifact: [`caiovicentino1/FabricationGuard-linearprobe-qwen36-27b`](https://huggingface.co/datasets/caiovicentino1/FabricationGuard-linearprobe-qwen36-27b). Live demo: [openinterp.org/products/fabricationguard](https://openinterp.org/products/fabricationguard).
+
+## 🧬 ProbeBench (v0.2.0+)
+
+The first categorical leaderboard for activation probes — 8 categories, 7-axis ProbeScore, anti-Goodhart by construction.
+
+```python
+from openinterp import probebench
+
+probes = probebench.list_probes(category="hallucination")
+probe  = probebench.load("openinterp/fabricationguard-qwen36-27b-l31-v2")
+score  = probe.score(activations)
+```
+
+```bash
+openinterp probebench list                       # show all registered probes
+openinterp probebench load <probe-id>            # download + verify SHA-256
+openinterp probebench validate ./my-probe/       # check artifact spec
+openinterp probebench reproduce <probe-id>       # download reproducer notebook
+```
+
+Browse the leaderboard: [openinterp.org/probebench](https://openinterp.org/probebench).
+
+---
+
+## 📦 What's in v0.2.0
 
 | Command | Status | What it does |
 |---|---|---|
 | `openinterp atlas <query>` | ✅ live | Feature search with offline fallback to curated demo features |
 | `openinterp trace ...` | ✅ live (needs `[full]`) | Real SAE trace generation, sae_lens format, any HF model |
+| `openinterp guard ...` | ✅ live | FabricationGuard scoring + abstain mode on Qwen3.6-27B |
+| `openinterp probebench {list,load,score,validate,reproduce,submit}` | ✅ live | ProbeBench v0.0.1 SDK |
 | `openinterp info` | ✅ live | Version + optional-dep status |
 
-### Planned v0.2.0 (Q2 2026)
+### Planned v0.3.0
 
 - `openinterp upload-trace <trace.json>` → shareable openinterp.org URL
 - `openinterp score --sae-repo X` → compute InterpScore (wraps [notebook 18](https://github.com/OpenInterpretability/notebooks/blob/main/notebooks/18_interpscore_eval.ipynb))
 - `openinterp steer --sae-repo X --feature Y --alpha Z` → intervention (wraps [notebook 06](https://github.com/OpenInterpretability/notebooks/blob/main/notebooks/06_steer_your_model.ipynb))
 - `openinterp circuit --sae-repo X --prompt Y` → attribution graph JSON (wraps [notebook 14/15](https://github.com/OpenInterpretability/notebooks/))
 - `openinterp publish <repo>` → HuggingFace release with model card
+- ReasoningGuard probe (in-flight, Apr 2026)
 
 Open an issue on the [tracker](https://github.com/OpenInterpretability/cli/issues) if you'd take one of these.
 
