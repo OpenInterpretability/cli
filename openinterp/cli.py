@@ -14,6 +14,7 @@ from openinterp import __version__
 from openinterp.atlas import search_features
 from openinterp.trace import generate_trace, TraceUnavailable
 from openinterp.guard import FabricationGuard, FabricationGuardError
+from openinterp.probebench import probebench_cli
 
 console = Console()
 
@@ -222,6 +223,11 @@ def guard(
         console.print(f"[bold]Status:[/bold] [yellow]ABSTAINED[/yellow] (score above threshold)")
     console.print(f"\n[bold]Output:[/bold]")
     console.print(out["text"])
+
+
+# --- probebench --------------------------------------------------------------
+
+main.add_command(probebench_cli())
 
 
 # --- info --------------------------------------------------------------------

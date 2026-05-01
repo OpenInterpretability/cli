@@ -170,7 +170,24 @@ Browse the leaderboard: [openinterp.org/probebench](https://openinterp.org/probe
 
 ---
 
-## 📦 What's in v0.2.0
+## 🔧 v0.2.1 — `safe_load_qwen36_lora()`
+
+Encapsulates the Qwen3.6 PEFT-save `.language_model.` infix bug discovered during paper-2 grokking work (April 2026). Saved Qwen3.6 LoRA adapters carry an extra `.language_model.` infix in state-dict keys; `PeftModel.from_pretrained()` against a reloaded dense Qwen3.6 silently fails — adapter loaded, max logit-diff = `0.000`, no error raised.
+
+```python
+from openinterp import safe_load_qwen36_lora
+
+model = safe_load_qwen36_lora(
+    base_model_id="Qwen/Qwen3.6-27B",
+    adapter_path="path/to/checkpoint-200",
+)  # auto strip .language_model. + auto verify logit-diff > 0.01
+```
+
+Also exposed: `strip_language_model_infix()`, `verify_adapter_loaded()`, `LoRAVerificationError`. This bug invalidated ~10 hours of prior eval work before being caught — anyone working with Qwen3.6 LoRA save/reload pipelines should run the sanity check.
+
+---
+
+## 📦 What's in v0.2.x
 
 | Command | Status | What it does |
 |---|---|---|
@@ -178,6 +195,7 @@ Browse the leaderboard: [openinterp.org/probebench](https://openinterp.org/probe
 | `openinterp trace ...` | ✅ live (needs `[full]`) | Real SAE trace generation, sae_lens format, any HF model |
 | `openinterp guard ...` | ✅ live | FabricationGuard scoring + abstain mode on Qwen3.6-27B |
 | `openinterp probebench {list,load,score,validate,reproduce,submit}` | ✅ live | ProbeBench v0.0.1 SDK |
+| `openinterp.lora.safe_load_qwen36_lora` | ✅ live (v0.2.1) | Safe Qwen3.6 LoRA loader with strip + verify |
 | `openinterp info` | ✅ live | Version + optional-dep status |
 
 ### Planned v0.3.0
