@@ -4,6 +4,36 @@ All notable changes to `openinterp` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] — 2026-05-01
+
+### Added — `openinterp.lora` module
+
+- **`safe_load_qwen36_lora(base_model_id, adapter_path, ...)`** — safe loader
+  for Qwen3.6 LoRA adapters that auto-strips the `.language_model.` infix from
+  PEFT-saved state-dict keys and verifies via logit-diff sanity check.
+  Discovered in nb39 → nb40 → nb41 v2 (April 2026): without the strip,
+  `PeftModel.from_pretrained()` against a reloaded dense Qwen3.6 silently
+  fails — adapter loaded, max logit-diff = `0.000`, no error raised.
+- **`strip_language_model_infix(state_dict)`** — pure dict transform exposed
+  for users who handle their own load pipeline.
+- **`verify_adapter_loaded(base, loaded, tokenizer, ...)`** — standalone
+  sanity check returning max logit-diff between base and loaded models.
+- **`LoRAVerificationError`** — raised when adapter loaded but produced no
+  functional change (the silent-failure mode of the bug).
+
+```python
+from openinterp import safe_load_qwen36_lora
+
+model = safe_load_qwen36_lora(
+    base_model_id="Qwen/Qwen3.6-27B",
+    adapter_path="path/to/checkpoint-200",
+)  # auto strip + auto verify
+```
+
+This bug invalidated about 10 hours of prior eval work on our paper-2 (probe-detected
+grokking in multi-probe DPO) before being caught. Anyone working with Qwen3.6 LoRA
+save/reload pipelines should run the sanity check.
+
 ## [0.2.0] — 2026-04-27
 
 ### Added — FabricationGuard
