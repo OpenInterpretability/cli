@@ -23,8 +23,10 @@ from openinterp.atlas import search_features, get_feature
 from openinterp.trace import generate_trace, upload_trace, TraceUnavailable
 from openinterp.guard import FabricationGuard, FabricationGuardError, GuardOutput
 from openinterp.models import AtlasFeature, Trace, TraceFeature
+from openinterp.lora import safe_load_qwen36_lora, strip_language_model_infix, LoRAVerificationError
+from openinterp import probebench
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "Caio Vicentino"
 __license__ = "Apache-2.0"
 
@@ -40,5 +42,9 @@ __all__ = [
     "AtlasFeature",
     "Trace",
     "TraceFeature",
+    "safe_load_qwen36_lora",
+    "strip_language_model_infix",
+    "LoRAVerificationError",
+    "probebench",
     "__version__",
 ]
