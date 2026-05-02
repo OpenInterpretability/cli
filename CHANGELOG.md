@@ -4,6 +4,25 @@ All notable changes to `openinterp` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.2] — 2026-05-01
+
+### Fixed — `safe_load_qwen36_lora` false-positive verification
+
+The `verify=True` path of `safe_load_qwen36_lora()` was raising
+`LoRAVerificationError` even when the adapter loaded correctly.
+
+Root cause: `PeftModel.from_pretrained(base_model, ...)` mutates `base_model`
+in-place by injecting LoRA layers. The previous code captured `base_logits`
+AFTER this mutation, so the "base" reference was already the LoRA-applied
+model. Comparing it against `loaded_logits` from the same object produced
+`diff = 0.000`, which the verifier flagged as silent failure — but in
+reality the adapter was working.
+
+Fix: capture `base_logits` BEFORE calling `PeftModel.from_pretrained()`.
+This produces an honest reference for the diff comparison.
+
+Discovered during nb44 v2 (paper-3 behavior eval) on 2026-05-01.
+
 ## [0.2.1] — 2026-05-01
 
 ### Added — `openinterp.lora` module

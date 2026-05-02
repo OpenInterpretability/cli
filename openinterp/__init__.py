@@ -26,7 +26,7 @@ from openinterp.models import AtlasFeature, Trace, TraceFeature
 from openinterp.lora import safe_load_qwen36_lora, strip_language_model_infix, LoRAVerificationError
 from openinterp import probebench
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __author__ = "Caio Vicentino"
 __license__ = "Apache-2.0"
 

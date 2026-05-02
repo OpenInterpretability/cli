@@ -139,16 +139,36 @@ def safe_load_qwen36_lora(
             fixed_path = adapter_path / "adapter_model.safetensors"
             save_file(fixed, str(fixed_path))
 
-    # Load adapter onto base model
+    # Capture base logits BEFORE applying adapter (PeftModel.from_pretrained
+    # mutates base_model in-place — comparing afterward gives 0 diff and a
+    # false-positive "silent failure" — bug fixed in v0.2.2).
+    if verify:
+        base_logits = None
+        try:
+            inputs = tokenizer(verify_prompt, return_tensors="pt").to(base_model.device)
+            with torch.no_grad():
+                base_logits = base_model(**inputs).logits.clone()
+        except Exception as e:
+            # If we can't run the base model, skip verification
+            base_logits = None
+
+    # Load adapter onto base model (this mutates base_model in-place)
     loaded_model = PeftModel.from_pretrained(base_model, str(adapter_path))
 
-    # Verify
-    if verify:
-        diff = verify_adapter_loaded(
-            base_model, loaded_model, tokenizer,
-            prompt=verify_prompt, tolerance=verify_tolerance,
-        )
-        # Ok — adapter is functional
+    # Verify against the pre-captured base logits
+    if verify and base_logits is not None:
+        inputs = tokenizer(verify_prompt, return_tensors="pt").to(loaded_model.device)
+        with torch.no_grad():
+            loaded_logits = loaded_model(**inputs).logits
+        diff = (base_logits - loaded_logits).abs().max().item()
+        if diff < verify_tolerance:
+            raise LoRAVerificationError(
+                f"Adapter silently failed to load: max logit-diff={diff:.6f} "
+                f"(below tolerance {verify_tolerance}). "
+                f"Check that adapter_config.json target_modules matches the "
+                f"base model architecture, and that the adapter weights are "
+                f"not all zero."
+            )
     return loaded_model
 
 
