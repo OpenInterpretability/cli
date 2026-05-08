@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openinterp"
-version = "0.2.2"
-description = "Python SDK + CLI for openinterp.org — Atlas search, SAE Traces, FabricationGuard hallucination detection, InterpScore. The operational layer for mechanistic interpretability."
+version = "0.3.0"
+description = "Python SDK + CLI for openinterp.org — Atlas search, SAE Traces, FabricationGuard hallucination detection, AgentProbeGuard mid-reasoning gate for code agents, InterpScore. The operational layer for mechanistic interpretability."
 authors = [{name = "Caio Vicentino", email = "hi@openinterp.org"}]
 license = {text = "Apache-2.0"}
 readme = "README.md"

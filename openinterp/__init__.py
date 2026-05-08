@@ -22,11 +22,12 @@ CLI:
 from openinterp.atlas import search_features, get_feature
 from openinterp.trace import generate_trace, upload_trace, TraceUnavailable
 from openinterp.guard import FabricationGuard, FabricationGuardError, GuardOutput
+from openinterp.agent_probe_guard import AgentProbeGuard, AgentProbeGuardError, Decision
 from openinterp.models import AtlasFeature, Trace, TraceFeature
 from openinterp.lora import safe_load_qwen36_lora, strip_language_model_infix, LoRAVerificationError
 from openinterp import probebench
 
-__version__ = "0.2.2"
+__version__ = "0.3.0"
 __author__ = "Caio Vicentino"
 __license__ = "Apache-2.0"
 
@@ -39,6 +40,9 @@ __all__ = [
     "FabricationGuard",
     "FabricationGuardError",
     "GuardOutput",
+    "AgentProbeGuard",
+    "AgentProbeGuardError",
+    "Decision",
     "AtlasFeature",
     "Trace",
     "TraceFeature",
