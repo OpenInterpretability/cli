@@ -474,6 +474,142 @@ class AgentProbeGuard:
             )
         return base + (partial_response or "")
 
+    # ----------------------------------------------------------- refit
+    def refit(
+        self,
+        prompts: Sequence[Union[str, List[Dict[str, str]]]],
+        labels: Sequence[int],
+        capability_K: Optional[int] = None,
+        thinking_K: Optional[int] = None,
+        verbose: bool = True,
+    ) -> Dict[str, float]:
+        """Refit both probes on the current inference environment.
+
+        Probe weights from :meth:`from_pretrained` are coupled to the residual
+        distribution of the environment they were captured in (attention
+        implementation, fla/flash kernels, transformers version). When that
+        environment differs from yours, expect AUROC to drop by 5-15 points
+        and threshold-based routing to skew toward "proceed" — even though the
+        underlying signal remains. This method captures fresh activations on
+        your model and re-fits the top-K probes in place, replacing the loaded
+        weights with environment-matched ones.
+
+        Parameters
+        ----------
+        prompts
+            List of prompts. Each can be a fully-rendered string OR a chat
+            messages list (will be rendered via ``apply_chat_template``).
+        labels
+            Binary labels (0/1) aligned with ``prompts``. For the capability
+            probe these should be patch-success / trace-success indicators;
+            for the thinking probe, ``has_think_v1`` (auto-injected
+            continuation past ``<think>``).
+        capability_K, thinking_K
+            Override the K values from the loaded probes. Defaults preserve
+            the original capacities (10, 5).
+
+        Returns
+        -------
+        dict with ``capability_auroc`` and ``thinking_auroc`` from 4-fold
+        cross-validation on the refit data. AUROCs ≥ 0.80 indicate signal is
+        real on this env; if both fall below 0.70, capture quality may need
+        investigation.
+        """
+        _require_full()
+        if self.model is None or self.tok is None:
+            raise AgentProbeGuardError("Guard not attached. Call .attach(model, tok) first.")
+
+        import numpy as np
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.model_selection import StratifiedKFold
+        from sklearn.metrics import roc_auc_score
+
+        if len(prompts) != len(labels):
+            raise AgentProbeGuardError(
+                f"len(prompts)={len(prompts)} != len(labels)={len(labels)}"
+            )
+        y = np.asarray([int(yi) for yi in labels])
+
+        cap_K = int(capability_K) if capability_K is not None else len(self.capability_dims)
+        thk_K = int(thinking_K) if thinking_K is not None else len(self.thinking_dims)
+
+        if verbose:
+            print(f"Refit on N={len(y)} prompts (capability K={cap_K}, thinking K={thk_K})")
+
+        caps_cap, caps_thk = [], []
+        for i, p in enumerate(prompts):
+            if isinstance(p, str):
+                text = p
+            else:
+                text = self._render_chat(p, "")
+            self._forward_and_capture(text)
+            for buf, layer, lst in (
+                (self._buf, self.capability_layer, caps_cap),
+                (self._buf, self.thinking_layer, caps_thk),
+            ):
+                h = buf[layer]
+                # Use last attended position
+                last_idx = h.shape[1] - 1
+                lst.append(h[0, last_idx].float().cpu().numpy())
+            if verbose and (i + 1) % 50 == 0:
+                print(f"  captured {i+1}/{len(prompts)}")
+
+        X_cap = np.stack(caps_cap)
+        X_thk = np.stack(caps_thk)
+
+        def _topk_diff(X, y, k):
+            d = np.abs(X[y == 1].mean(0) - X[y == 0].mean(0))
+            return np.argsort(-d)[:k]
+
+        def _fit(X, y, K, label):
+            skf = StratifiedKFold(n_splits=4, shuffle=True, random_state=42)
+            cv = []
+            for tr, te in skf.split(X, y):
+                d_tr = _topk_diff(X[tr], y[tr], K)
+                sc = StandardScaler()
+                Xtr = np.nan_to_num(sc.fit_transform(X[tr][:, d_tr]), nan=0.0, posinf=0.0, neginf=0.0)
+                Xte = np.nan_to_num(sc.transform(X[te][:, d_tr]), nan=0.0, posinf=0.0, neginf=0.0)
+                clf = LogisticRegression(C=1.0, max_iter=2000, class_weight="balanced")
+                clf.fit(Xtr, y[tr])
+                cv.append(roc_auc_score(y[te], clf.predict_proba(Xte)[:, 1]))
+            auroc = float(np.mean(cv))
+
+            # Final fit on all data using fold-stable selection
+            dims = _topk_diff(X, y, K)
+            sc = StandardScaler()
+            Xs = np.nan_to_num(sc.fit_transform(X[:, dims]), nan=0.0, posinf=0.0, neginf=0.0)
+            clf = LogisticRegression(C=1.0, max_iter=2000, class_weight="balanced")
+            clf.fit(Xs, y)
+            return clf, sc, tuple(int(d) for d in dims), auroc
+
+        cap_clf, cap_sc, cap_dims, cap_auroc = _fit(X_cap, y, cap_K, "capability")
+        thk_clf, thk_sc, thk_dims, thk_auroc = _fit(X_thk, y, thk_K, "thinking")
+
+        # Replace loaded probes in place
+        self.capability_probe = cap_clf
+        self.capability_scaler = cap_sc
+        self.capability_dims = cap_dims
+        self.thinking_probe = thk_clf
+        self.thinking_scaler = thk_sc
+        self.thinking_dims = thk_dims
+        self.meta = dict(self.meta)
+        self.meta["refit"] = {
+            "n": int(len(y)),
+            "capability_auroc": cap_auroc,
+            "thinking_auroc": thk_auroc,
+            "capability_dims": list(cap_dims),
+            "thinking_dims": list(thk_dims),
+        }
+
+        if verbose:
+            print(f"capability AUROC (refit, 4-fold CV): {cap_auroc:.4f}")
+            print(f"thinking AUROC (refit, 4-fold CV): {thk_auroc:.4f}")
+            print(f"new capability dims: {list(cap_dims)}")
+            print(f"new thinking dims: {list(thk_dims)}")
+
+        return {"capability_auroc": cap_auroc, "thinking_auroc": thk_auroc}
+
     # ----------------------------------------------------------- repr
     def __repr__(self) -> str:
         attached = "attached" if self.model is not None else "detached"
