@@ -170,6 +170,11 @@ Browse the leaderboard: [openinterp.org/probebench](https://openinterp.org/probe
 
 ---
 
+## AgentProbeGuard cookbooks
+
+- [`examples/agent_probe_guard_env_coupling.md`](./examples/agent_probe_guard_env_coupling.md) - detect env coupling with cosine + residual norms, refit with `AgentProbeGuard.refit()`, and choose between one refit helper vs per-env weight variants.
+
+---
 ## 🔧 v0.2.1 — `safe_load_qwen36_lora()`
 
 Encapsulates the Qwen3.6 PEFT-save `.language_model.` infix bug discovered during paper-2 grokking work (April 2026). Saved Qwen3.6 LoRA adapters carry an extra `.language_model.` infix in state-dict keys; `PeftModel.from_pretrained()` against a reloaded dense Qwen3.6 silently fails — adapter loaded, max logit-diff = `0.000`, no error raised.
